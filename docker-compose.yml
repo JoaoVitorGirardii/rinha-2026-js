@@ -1,0 +1,45 @@
+services:
+  api1:
+    build: .
+    environment:
+      PORT: 3000
+    networks:
+      - rinha
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: "165MB"
+
+  api2:
+    build: .
+    environment:
+      PORT: 3000
+    networks:
+      - rinha
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: "165MB"
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "9999:9999"
+    depends_on:
+      - api1
+      - api2
+    networks:
+      - rinha
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: "20MB"
+
+networks:
+  rinha:
+    driver: bridge
