@@ -1,6 +1,9 @@
 services:
   api1:
     build: .
+    command: node --watch src/server.js
+    volumes:
+      - ./src:/app/src
     environment:
       PORT: 3000
     networks:
@@ -13,6 +16,9 @@ services:
 
   api2:
     build: .
+    command: node --watch src/server.js
+    volumes:
+      - ./src:/app/src
     environment:
       PORT: 3000
     networks:
@@ -32,6 +38,7 @@ services:
     depends_on:
       - api1
       - api2
+    restart: on-failure
     networks:
       - rinha
     deploy:
