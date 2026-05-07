@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import KNN from 'ml-knn'
 
-const MAX_SAMPLES = 50000
+const MAX_SAMPLES = 5000
 const labelTempoProcessamento = 'Tempo de processamento: '
 
 console.time(labelTempoProcessamento)
@@ -19,7 +19,7 @@ const dataset = sampled.map(r => r.vector)
 const labels  = sampled.map(r => r.label)
 
 console.log('Treinando KNN...')
-const knn = new KNN(dataset, labels, { k: 3 })
+const knn = new KNN(dataset, labels, { k: 5 })
 
 console.log('Serializando modelo...')
 writeFileSync('./model.json', JSON.stringify(knn.toJSON()))

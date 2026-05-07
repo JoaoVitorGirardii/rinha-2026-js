@@ -17,10 +17,15 @@ const server = createServer((req, res) => {
     let body = '';
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
-      const vector = createVector(JSON.parse(body));
-      const { fraud_score, approved } = knnScoreService(vector, 5);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ approved, fraud_score }));
+      try {
+        const vector = createVector(JSON.parse(body));
+        const { fraud_score, approved } = knnScoreService(vector);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ approved, fraud_score }));
+      } catch {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ approved: false, fraud_score: 0 }));
+      }
     });
     return;
   }
@@ -29,6 +34,4 @@ const server = createServer((req, res) => {
   res.end();
 });
 
-server.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
