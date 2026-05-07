@@ -2,61 +2,50 @@ import { MCC_RISK } from "./mccRisk.js"
 import { NORMALIZATION } from "./normalization.js"
 
 export function limit(valor) {
-    if (valor == null || valor == undefined) return -1
+    if (valor == null || valor !== valor) return 0  // null, undefined, NaN → 0
     if (valor > 1) return 1.0
     if (valor < 0) return 0.0
-
-    return Number(valor.toFixed(4))
+    return valor
 }
 
-function hour(date) {
-    const dateTime = new Date(date)
-    return dateTime.getHours()
-}
-
-function dayWeek(date) {
-    const dateTime = new Date(date)
-    return dateTime.getDay()
-}
-
-function minutes(date) {
-    const dateTime = new Date(date)
-    return dateTime.getMinutes()
-}
+// Buffer estático reutilizado por request (Node.js é single-threaded, sem race condition)
+const _vec = new Float32Array(14)
 
 export function createVector(json) {
+    const tx    = json.transaction     ?? {}
+    const cust  = json.customer        ?? {}
+    const term  = json.terminal        ?? {}
+    const merch = json.merchant        ?? {}
+    const lastTx = json.last_transaction
 
-    const amount = limit(json.transaction.amount / NORMALIZATION.max_amount)
-    const installments = limit(json.transaction.installments / NORMALIZATION.max_installments)
-    const amount_vs_avg = limit((json.transaction.amount / json.customer.avg_amount) / NORMALIZATION.amount_vs_avg_ratio)
-    const hour_of_day = limit(hour(json.transaction.requested_at) / 23)
-    const day_of_week = dayWeek(json.transaction.requested_at) / 6
-    const minutes_since_last_tx = json.last_transaction == null ? -1 : minutes(json.last_transaction.timestamp) / NORMALIZATION.max_minutes
-    const km_from_last_tx = json.last_transaction == null ? -1 : limit(json.last_transaction.km_from_current / NORMALIZATION.max_km)
-    const km_from_home = limit(json.terminal.km_from_home / NORMALIZATION.max_km)
-    const tx_count_24h = limit(json.customer.tx_count_24h / NORMALIZATION.max_tx_count_24h)
-    const is_online = json.terminal.is_online == true ? 1 : 0
-    const card_present = json.terminal.card_present == true ? 1 : 0
-    const unknown_merchant = json.customer.known_merchants?.find(item => item == json.merchant.id) ? 0 : 1
-    const mcc_risk = MCC_RISK[json.marchant?.mcc] ?? 0.5
-    const merchant_avg_amount = limit(json.merchant.avg_amount / NORMALIZATION.max_merchant_avg_amount)
+    const date = tx.requested_at
+    let hourVal = 0, dayVal = 0
+    if (date) {
+        const d = new Date(date)
+        hourVal = limit(d.getHours() / 23)
+        dayVal  = d.getDay() / 6
+    }
 
-    return [
-        amount, 
-        installments, 
-        amount_vs_avg, 
-        hour_of_day, 
-        day_of_week, 
-        minutes_since_last_tx, 
-        km_from_last_tx, 
-        km_from_home, 
-        tx_count_24h, 
-        is_online, 
-        card_present, 
-        unknown_merchant, 
-        mcc_risk, 
-        merchant_avg_amount
-    ]
+    let minutesSinceLast = -1, kmFromLast = -1
+    if (lastTx != null) {
+        minutesSinceLast = limit(new Date(lastTx.timestamp).getMinutes() / NORMALIZATION.max_minutes)
+        kmFromLast       = limit((lastTx.km_from_current ?? 0) / NORMALIZATION.max_km)
+    }
+
+    _vec[0]  = limit((tx.amount ?? 0) / NORMALIZATION.max_amount)
+    _vec[1]  = limit((tx.installments ?? 0) / NORMALIZATION.max_installments)
+    _vec[2]  = limit((tx.amount ?? 0) / ((cust.avg_amount || 1) * NORMALIZATION.amount_vs_avg_ratio))
+    _vec[3]  = hourVal
+    _vec[4]  = dayVal
+    _vec[5]  = minutesSinceLast
+    _vec[6]  = kmFromLast
+    _vec[7]  = limit((term.km_from_home ?? 0) / NORMALIZATION.max_km)
+    _vec[8]  = limit((cust.tx_count_24h ?? 0) / NORMALIZATION.max_tx_count_24h)
+    _vec[9]  = term.is_online    === true ? 1 : 0
+    _vec[10] = term.card_present === true ? 1 : 0
+    _vec[11] = cust.known_merchants?.find(item => item === merch.id) ? 0 : 1
+    _vec[12] = MCC_RISK[merch.mcc] ?? 0.5
+    _vec[13] = limit((merch.avg_amount ?? 0) / NORMALIZATION.max_merchant_avg_amount)
+
+    return _vec
 }
-
-

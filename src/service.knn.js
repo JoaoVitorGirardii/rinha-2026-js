@@ -1,40 +1,24 @@
-import KNN from 'ml-knn';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const modelData = JSON.parse(readFileSync(join(__dirname, '../model.json'), 'utf-8'));
-const knn = KNN.load(modelData);
+const buf = readFileSync(join(__dirname, '../model.bin'));
 
-// Extrai os pontos de treino da KD-tree e armazena em typed arrays contíguos
-// Float64Array → SIMD-friendly, muito mais rápido que percorrer ponteiros da árvore
-const D = 14;
-const rawPoints = [];
-function collectNodes(node) {
-  if (!node || !node.obj) return;
-  rawPoints.push(node.obj);
-  collectNodes(node.left);
-  collectNodes(node.right);
-}
-collectNodes(knn.kdTree.root);
+const N = buf.readUInt32LE(0);
+const D = buf.readUInt32LE(4);
+const featuresStart = 8;
+const labelsStart = featuresStart + N * D * 4;
 
-const N = rawPoints.length;
-const features = new Float64Array(N * D);
-const labels = new Uint8Array(N); // 1 = fraud, 0 = legit
-
-for (let i = 0; i < N; i++) {
-  const p = rawPoints[i];
-  for (let j = 0; j < D; j++) features[i * D + j] = p[j];
-  labels[i] = p[D] === 'fraud' ? 1 : 0;
-}
+// Views zero-copy sobre o Buffer lido do disco (sem cópia de memória)
+const features = new Float32Array(buf.buffer, buf.byteOffset + featuresStart, N * D);
+const labels = new Uint8Array(buf.buffer, buf.byteOffset + labelsStart, N);
 
 console.log(`KNN pronto: ${N} pontos de treino carregados.`);
 
-const K = 3;
+const K = 5;
 
 export function knnScoreService(vector) {
-  // Linear scan top-K: mais rápido que KD-tree para N pequeno em alta dimensão
   let d0 = Infinity, d1 = Infinity, d2 = Infinity;
   let l0 = 0, l1 = 0, l2 = 0;
 

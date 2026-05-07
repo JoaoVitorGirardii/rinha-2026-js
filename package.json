@@ -6,7 +6,5 @@
     "start": "node src/server.js",
     "train": "node scripts/train.js"
   },
-  "dependencies": {
-    "ml-knn": "^3.0.0"
-  }
+  "dependencies": {}
 }
