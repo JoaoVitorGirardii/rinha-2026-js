@@ -58,3 +58,5 @@ export function createVector(json) {
         merchant_avg_amount
     ]
 }
+
+

@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { createVector } from './func.js';
+import { knnScoreService } from './service.knn.js';
 
 const PORT = process.env.PORT ?? 3000;
 
@@ -16,12 +17,10 @@ const server = createServer((req, res) => {
     let body = '';
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
+      const vector = createVector(JSON.parse(body));
+      const { fraud_score, approved } = knnScoreService(vector, 5);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-
-      const teste = createVector(JSON.parse(body))
-      console.log("createVector: ", teste)
-
-      res.end(JSON.stringify({ approved: false, fraud_score: 0.0 }));
+      res.end(JSON.stringify({ approved, fraud_score }));
     });
     return;
   }

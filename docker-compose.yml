@@ -4,6 +4,7 @@ services:
     command: node --watch src/server.js
     volumes:
       - ./src:/app/src
+      - ./model.json:/app/model.json:ro
     environment:
       PORT: 3000
     networks:
@@ -19,6 +20,7 @@ services:
     command: node --watch src/server.js
     volumes:
       - ./src:/app/src
+      - ./model.json:/app/model.json:ro
     environment:
       PORT: 3000
     networks:
