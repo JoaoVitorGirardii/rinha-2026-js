@@ -1,6 +1,6 @@
 services:
   api1:
-    image: joaovitorgirardii/rinha-2026-js:latest
+    image: joaovitorgirardiii/rinha-2026-js:latest
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
@@ -13,7 +13,7 @@ services:
           memory: "108MB"
 
   api2:
-    image: joaovitorgirardii/rinha-2026-js:latest
+    image: joaovitorgirardiii/rinha-2026-js:latest
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
@@ -26,7 +26,7 @@ services:
           memory: "108MB"
 
   api3:
-    image: joaovitorgirardii/rinha-2026-js:latest
+    image: joaovitorgirardiii/rinha-2026-js:latest
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
