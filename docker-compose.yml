@@ -1,8 +1,6 @@
 services:
   api1:
-    build: .
-    volumes:
-      - ./model-tree.json:/app/model-tree.json:ro
+    image: joaovitorgirardii/rinha-2026-js:latest
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
@@ -15,9 +13,7 @@ services:
           memory: "108MB"
 
   api2:
-    build: .
-    volumes:
-      - ./model-tree.json:/app/model-tree.json:ro
+    image: joaovitorgirardii/rinha-2026-js:latest
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
@@ -30,9 +26,7 @@ services:
           memory: "108MB"
 
   api3:
-    build: .
-    volumes:
-      - ./model-tree.json:/app/model-tree.json:ro
+    image: joaovitorgirardii/rinha-2026-js:latest
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
