@@ -1,35 +1,48 @@
 services:
   api1:
     build: .
-    command: node --watch src/server.js
     volumes:
-      - ./src:/app/src
-      - ./model.json:/app/model.json:ro
+      - ./model-tree.json:/app/model-tree.json:ro
     environment:
       PORT: 3000
+      TREE_MODEL_PATH: /app/model-tree.json
     networks:
       - rinha
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: "165MB"
+          cpus: "0.30"
+          memory: "108MB"
 
   api2:
     build: .
-    command: node --watch src/server.js
     volumes:
-      - ./src:/app/src
-      - ./model.json:/app/model.json:ro
+      - ./model-tree.json:/app/model-tree.json:ro
     environment:
       PORT: 3000
+      TREE_MODEL_PATH: /app/model-tree.json
     networks:
       - rinha
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: "165MB"
+          cpus: "0.30"
+          memory: "108MB"
+
+  api3:
+    build: .
+    volumes:
+      - ./model-tree.json:/app/model-tree.json:ro
+    environment:
+      PORT: 3000
+      TREE_MODEL_PATH: /app/model-tree.json
+    networks:
+      - rinha
+    deploy:
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: "108MB"
 
   nginx:
     image: nginx:alpine
@@ -40,6 +53,7 @@ services:
     depends_on:
       - api1
       - api2
+      - api3
     restart: on-failure
     networks:
       - rinha
@@ -47,7 +61,7 @@ services:
       resources:
         limits:
           cpus: "0.10"
-          memory: "20MB"
+          memory: "26MB"
 
 networks:
   rinha:

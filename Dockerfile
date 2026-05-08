@@ -1,10 +1,10 @@
-FROM node:22-alpine
-
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
-
 COPY package.json .
-RUN npm install
-
 COPY src/ src/
+RUN bun build --compile --minify src/server.js --outfile /server
 
-CMD ["node", "src/server.js"]
+FROM alpine:3
+RUN apk add --no-cache libstdc++ libgcc
+COPY --from=builder /server /server
+CMD ["/server"]
