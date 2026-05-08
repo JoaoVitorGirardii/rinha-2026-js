@@ -19,8 +19,8 @@ console.log(`KNN pronto: ${N} pontos de treino carregados.`);
 const K = 5;
 
 export function knnScoreService(vector) {
-  let d0 = Infinity, d1 = Infinity, d2 = Infinity;
-  let l0 = 0, l1 = 0, l2 = 0;
+  let d0 = Infinity, d1 = Infinity, d2 = Infinity, d3 = Infinity, d4 = Infinity;
+  let l0 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
 
   for (let i = 0; i < N; i++) {
     const base = i * D;
@@ -30,12 +30,14 @@ export function knnScoreService(vector) {
       sum += diff * diff;
     }
     const label = labels[i];
-    if (sum < d0)      { d2=d1; l2=l1; d1=d0; l1=l0; d0=sum; l0=label; }
-    else if (sum < d1) { d2=d1; l2=l1; d1=sum; l1=label; }
-    else if (sum < d2) { d2=sum; l2=label; }
+    if (sum < d0)      { d4=d3; l4=l3; d3=d2; l3=l2; d2=d1; l2=l1; d1=d0; l1=l0; d0=sum; l0=label; }
+    else if (sum < d1) { d4=d3; l4=l3; d3=d2; l3=l2; d2=d1; l2=l1; d1=sum; l1=label; }
+    else if (sum < d2) { d4=d3; l4=l3; d3=d2; l3=l2; d2=sum; l2=label; }
+    else if (sum < d3) { d4=d3; l4=l3; d3=sum; l3=label; }
+    else if (sum < d4) { d4=sum; l4=label; }
   }
 
-  const fraud_score = parseFloat(((l0 + l1 + l2) / K).toFixed(4));
-  const approved = fraud_score < 0.5;
+  const fraud_score = parseFloat(((l0 + l1 + l2 + l3 + l4) / K).toFixed(4));
+  const approved = fraud_score < 0.6;
   return { fraud_score, approved };
 }

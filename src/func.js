@@ -28,7 +28,8 @@ export function createVector(json) {
 
     let minutesSinceLast = -1, kmFromLast = -1
     if (lastTx != null) {
-        minutesSinceLast = limit(new Date(lastTx.timestamp).getMinutes() / NORMALIZATION.max_minutes)
+        const diffMs = new Date(tx.requested_at).getTime() - new Date(lastTx.timestamp).getTime()
+        minutesSinceLast = limit((diffMs / 60000) / NORMALIZATION.max_minutes)
         kmFromLast       = limit((lastTx.km_from_current ?? 0) / NORMALIZATION.max_km)
     }
 

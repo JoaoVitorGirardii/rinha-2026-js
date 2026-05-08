@@ -1,75 +1,90 @@
-import { createServer } from 'node:http';
-import { Worker } from 'node:worker_threads';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { createVector } from './func.js';
+import { createVector } from './func.js'
+import { knnScoreService } from './service.tree.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT ?? 3000;
-const MAX_QUEUE = 10;
-const DEFAULT = '{"approved":false,"fraud_score":0.5}';
+const PORT = process.env.PORT ?? 3000
 
-const worker = new Worker(join(__dirname, 'worker.js'));
-let nextId = 0;
-const pending = new Map();
-let queueSize = 0;
+// fraud_score = votes/5 onde votes ∈ {0,1,2,3,4,5} → apenas 6 respostas possíveis
+// threshold 0.2: aprova somente se 0/5 vizinhos são fraude (wFN=3 > wFP=1 → ser agressivo compensa)
+const RESPONSES = new Array(6)
+for (let v = 0; v <= 5; v++) {
+  const fraud_score = parseFloat((v / 5).toFixed(4))
+  const approved = fraud_score < 0.2
+  RESPONSES[v] = JSON.stringify({ fraud_score, approved })
+}
+const DEFAULT = RESPONSES[3]
+const HEADERS = { 'Content-Type': 'application/json' }
 
-worker.on('message', ({ id, result }) => {
-  queueSize--;
-  const res = pending.get(id);
-  pending.delete(id);
-  if (!res) return;
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(result));
-});
+// Aquece o JIT antes de receber tráfego
+const _warmVec = new Float32Array(14).fill(0.5)
+for (let _i = 0; _i < 5000; _i++) knnScoreService(_warmVec)
 
-worker.on('error', (err) => console.error('Worker error:', err));
+if (typeof Bun !== 'undefined') {
+  // Runtime Bun: usa servidor HTTP nativo (uWS internamente) para menor overhead
+  Bun.serve({
+    port: PORT,
+    idleTimeout: 30,
+    async fetch(req) {
+      const url = req.url
+      const method = req.method
 
-const server = createServer((req, res) => {
-  const { method, url } = req;
+      if (method === 'GET' && url.endsWith('/ready')) {
+        return new Response(null, { status: 200 })
+      }
 
-  if (method === 'GET' && url === '/ready') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
+      if (method === 'POST' && url.endsWith('/fraud-score')) {
+        let json
+        try {
+          json = await req.json()
+        } catch {
+          return new Response(DEFAULT, { headers: HEADERS })
+        }
+        const vector = createVector(json)
+        const votes = knnScoreService(vector)
+        return new Response(RESPONSES[votes], { headers: HEADERS })
+      }
 
-  if (method === 'POST' && url === '/fraud-score') {
-    if (queueSize >= MAX_QUEUE) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(DEFAULT);
-      return;
+      return new Response('Not Found', { status: 404 })
+    },
+    error() {
+      return new Response(DEFAULT, { headers: HEADERS })
+    }
+  })
+  console.log(`Servidor Bun rodando na porta ${PORT}`)
+} else {
+  // Fallback Node.js (para compatibilidade local / testes)
+  const { createServer } = await import('node:http')
+  let queueSize = 0
+  const MAX_QUEUE = 500
+
+  const server = createServer((req, res) => {
+    const { method, url } = req
+
+    if (method === 'GET' && url === '/ready') {
+      res.writeHead(200); res.end(); return
     }
 
-    let body = '';
-    req.on('data', (chunk) => { body += chunk; });
-    req.on('end', () => {
+    if (method === 'POST' && url === '/fraud-score') {
       if (queueSize >= MAX_QUEUE) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(DEFAULT);
-        return;
+        res.writeHead(200, HEADERS); res.end(DEFAULT); return
       }
+      queueSize++
+      let body = ''
+      req.on('data', c => { body += c })
+      req.on('end', () => {
+        queueSize--
+        let json
+        try { json = JSON.parse(body) } catch {
+          res.writeHead(200, HEADERS); res.end(DEFAULT); return
+        }
+        const vector = createVector(json)
+        const votes = knnScoreService(vector)
+        res.writeHead(200, HEADERS); res.end(RESPONSES[votes])
+      })
+      return
+    }
 
-      let json;
-      try {
-        json = JSON.parse(body);
-      } catch {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(DEFAULT);
-        return;
-      }
+    res.writeHead(404); res.end()
+  })
 
-      const vector = createVector(json);
-      const id = nextId++;
-      queueSize++;
-      pending.set(id, res);
-      worker.postMessage({ id, vector: new Float32Array(vector) });
-    });
-    return;
-  }
-
-  res.writeHead(404);
-  res.end();
-});
-
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+  server.listen(PORT, () => console.log(`Servidor Node.js rodando na porta ${PORT}`))
+}
