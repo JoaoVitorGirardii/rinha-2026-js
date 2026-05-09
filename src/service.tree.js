@@ -5,32 +5,56 @@ import { dirname, join } from 'node:path'
 const MODEL_PATH = process.env.TREE_MODEL_PATH
   ?? join(dirname(fileURLToPath(import.meta.url)), '../model-tree.json')
 
-const { n_nodes, features, thresholds, lefts, rights, values } =
-  JSON.parse(readFileSync(MODEL_PATH, 'utf8'))
+const model = JSON.parse(readFileSync(MODEL_PATH, 'utf8'))
 
-// TypedArrays para traversal cache-friendly
-const _feat   = new Int16Array(features)   // -2 = folha
-const _thresh = new Float32Array(thresholds)
-const _left   = new Int32Array(lefts)      // -1 = folha
-const _right  = new Int32Array(rights)
-const _val    = new Int8Array(values)      // -1 = nó interno, 0 ou 5 = folha
+const MODEL_TYPE = model.model_type ?? 'rf'
+const N_TREES = Math.min(model.n_trees, parseInt(process.env.TREE_COUNT ?? model.n_trees))
+const THRESHOLD = parseFloat(process.env.TREE_THRESHOLD ?? model.threshold ?? 0.4)
+const BIAS = model.bias ?? 0  // para HGB
+const isHGB = MODEL_TYPE === 'hgb'
 
-console.log(`Decision Tree pronto: ${n_nodes} nós (${(MODEL_PATH.endsWith('.json') ? 'JSON' : 'bin')})`)
+// Arrays planos contíguos (melhor localidade de cache — todos os dados em 5 blocos)
+const totalNodes = model.trees.slice(0, N_TREES).reduce((s, t) => s + t.n_nodes, 0)
+const _feat   = new Int16Array(totalNodes)
+const _thresh = new Float32Array(totalNodes)
+const _left   = new Int32Array(totalNodes)
+const _right  = new Int32Array(totalNodes)
+const _vals   = new Float32Array(totalNodes)
+const _offset = new Int32Array(N_TREES + 1)  // offset[t] = início da árvore t no array flat
+
+let pos = 0
+for (let t = 0; t < N_TREES; t++) {
+  const tree = model.trees[t]
+  const src = isHGB ? tree.values : tree.probs
+  _offset[t] = pos
+  for (let i = 0; i < tree.n_nodes; i++, pos++) {
+    _feat[pos]   = tree.features[i]
+    _thresh[pos] = tree.thresholds[i]
+    _left[pos]   = tree.lefts[i] === -1 ? -1 : tree.lefts[i] + _offset[t]
+    _right[pos]  = tree.rights[i] === -1 ? -1 : tree.rights[i] + _offset[t]
+    _vals[pos]   = src[i]
+  }
+}
+_offset[N_TREES] = pos
+
+const typeLabel = isHGB ? 'HGB' : 'Random Forest'
+console.log(`${typeLabel} pronto: ${N_TREES} árvores, ${totalNodes} nós, threshold=${THRESHOLD}${isHGB ? `, bias=${BIAS}` : ''}`)
+
+// sigmoid(x) = 1 / (1 + e^-x) — usado apenas para HGB
+function sigmoid(x) { return 1 / (1 + Math.exp(-x)) }
 
 export function knnScoreService(vector) {
-  // Early exit determinístico: 66% do tráfego, 0 erros validados em 3M refs
-  if (vector[11] === 0 && vector[2] < 0.15 && vector[7] < 0.05 && vector[12] <= 0.3 && vector[8] < 0.4 && vector[0] < 0.1) {
-    return 0
-  }
-  if (vector[11] === 1 && vector[2] > 0.8 && vector[12] >= 0.75 && vector[7] > 0.5 && vector[8] > 0.4) {
-    return 5
+  let acc = 0
+  for (let t = 0; t < N_TREES; t++) {
+    let idx = _offset[t]
+    while (_left[idx] !== -1) {
+      idx = vector[_feat[idx]] <= _thresh[idx] ? _left[idx] : _right[idx]
+    }
+    acc += _vals[idx]
   }
 
-  // Tree traversal: O(depth) ≈ 15 comparações
-  // sklearn: vai para esquerda se vector[feature] <= threshold
-  let idx = 0
-  while (_left[idx] !== -1) {
-    idx = vector[_feat[idx]] <= _thresh[idx] ? _left[idx] : _right[idx]
-  }
-  return _val[idx]  // 0 (legítima) ou 5 (fraude)
+  // RF: avg probability ≥ threshold → fraud
+  // HGB: sigmoid(bias + sum_leaves) ≥ threshold → fraud
+  const prob = isHGB ? sigmoid(BIAS + acc) : acc / N_TREES
+  return prob >= THRESHOLD ? 5 : 0
 }

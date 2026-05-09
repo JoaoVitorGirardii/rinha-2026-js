@@ -6,6 +6,8 @@ services:
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
+      TREE_COUNT: ${TREE_COUNT:-50}
+      TREE_THRESHOLD: ${TREE_THRESHOLD:-0.05}
     networks:
       - rinha
     deploy:
@@ -21,6 +23,8 @@ services:
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
+      TREE_COUNT: ${TREE_COUNT:-50}
+      TREE_THRESHOLD: ${TREE_THRESHOLD:-0.05}
     networks:
       - rinha
     deploy:
@@ -36,6 +40,8 @@ services:
     environment:
       PORT: 3000
       TREE_MODEL_PATH: /app/model-tree.json
+      TREE_COUNT: ${TREE_COUNT:-50}
+      TREE_THRESHOLD: ${TREE_THRESHOLD:-0.05}
     networks:
       - rinha
     deploy:
